@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  Master-Detail App
 //
-//  Created by user on 2020/03/22.
+//  Created by user on 2020/06/18.
 //  Copyright © 2020 256hax. All rights reserved.
 //
 
@@ -16,62 +16,66 @@ private let dateFormatter: DateFormatter = {
 }()
 
 struct ContentView: View {
-    @State private var dates = [Date]()
-
+    @Environment(\.managedObjectContext)
+    var viewContext   
+ 
     var body: some View {
         NavigationView {
-            MasterView(dates: $dates)
+            MasterView()
                 .navigationBarTitle(Text("Master"))
                 .navigationBarItems(
                     leading: EditButton(),
                     trailing: Button(
                         action: {
-                            withAnimation { self.dates.insert(Date(), at: 0) }
+                            withAnimation { Event.create(in: self.viewContext) }
                         }
-                    ) {
+                    ) { 
                         Image(systemName: "plus")
                     }
                 )
-            DetailView()
+            Text("Detail view content goes here")
+                .navigationBarTitle(Text("Detail"))
         }.navigationViewStyle(DoubleColumnNavigationViewStyle())
     }
 }
 
 struct MasterView: View {
-    @Binding var dates: [Date]
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Event.timestamp, ascending: true)], 
+        animation: .default)
+    var events: FetchedResults<Event>
+
+    @Environment(\.managedObjectContext)
+    var viewContext
 
     var body: some View {
         List {
-            ForEach(dates, id: \.self) { date in
+            ForEach(events, id: \.self) { event in
                 NavigationLink(
-                    destination: DetailView(selectedDate: date)
+                    destination: DetailView(event: event)
                 ) {
-                    Text("\(date, formatter: dateFormatter)")
+                    Text("\(event.timestamp!, formatter: dateFormatter)")
                 }
             }.onDelete { indices in
-                indices.forEach { self.dates.remove(at: $0) }
+                self.events.delete(at: indices, from: self.viewContext)
             }
         }
     }
 }
 
 struct DetailView: View {
-    var selectedDate: Date?
+    @ObservedObject var event: Event
 
     var body: some View {
-        Group {
-            if selectedDate != nil {
-                Text("\(selectedDate!, formatter: dateFormatter)")
-            } else {
-                Text("Detail view content goes here")
-            }
-        }.navigationBarTitle(Text("Detail"))
+        Text("\(event.timestamp!, formatter: dateFormatter)")
+            .navigationBarTitle(Text("Detail"))
     }
 }
 
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-        ContentView()
+        let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+        return ContentView().environment(\.managedObjectContext, context)
     }
 }
